@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 Toni Spets <toni.spets@iki.fi>
+ * Copyright (c) 2011, 2012 Toni Spets <toni.spets@iki.fi>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,32 +18,45 @@
 
 #ifndef __SYRINGE_H_
 
-extern intptr_t *_syringe_cb_addr;
-
 typedef struct
 {
     intptr_t func;      /* local function to map */
     intptr_t addr;      /* address in the program memory to patch */
+    intptr_t callback;  /* address to call the original function */
     const char *name;   /* for logging, optional */
 } syringe_hook;
 
-#define SYRINGE_CDECL ((int __cdecl (*)())*_syringe_cb_addr)
-#define SYRINGE_STDCALL ((int __stdcall (*)())*_syringe_cb_addr)
-#define SYRINGE_FASTCALL ((int __fastcall (*)())*_syringe_cb_addr)
-
-#define SYRINGE_CB(func, addr) { (intptr_t)func, (intptr_t)addr, NULL }
-#define SYRINGE_CB_EX(func, addr, name) { (intptr_t)func, (intptr_t)addr, (const char *)name }
 #define SYRINGE_EXPORT(...) \
-    intptr_t *_syringe_cb_addr; \
-    __declspec(dllexport) int _syringe_export(syringe_hook **_hooks, intptr_t *cb) \
+    __declspec(dllexport) int _syringe_export(syringe_hook **_hooks) \
     { \
-        static syringe_hook a[] = { \
+        static syringe_hook *a[] = { \
             __VA_ARGS__ \
         }; \
-        *_hooks = (syringe_hook *)&a; \
-        _syringe_cb_addr = cb; \
-        return sizeof(a) / sizeof(syringe_hook); \
+        *_hooks = *a; \
+        return sizeof a / sizeof (syringe_hook *); \
     }
+
+#define SYRINGE_HOOKDEF(type, name, ...) \
+    type name##_func(__VA_ARGS__); \
+    syringe_hook name;
+
+#define SYRINGE_HOOK(addr, type, name, ...) \
+    XSYRINGE_HOOK(addr, type, name, #type, #name, #__VA_ARGS__, __VA_ARGS__)
+
+#define XSYRINGE_HOOK(addr, type, name, stype, sname, sargs, ...) \
+    SYRINGE_HOOKDEF(type, name, __VA_ARGS__) \
+    syringe_hook name = { (intptr_t)name##_func, (intptr_t)addr, 0xBAADF00D, stype " " sname "(" sargs ")" }; \
+    type name##_func(__VA_ARGS__)
+
+#define SYRINGE_CALL(name, ...) \
+    name##_func(__VA_ARGS__)
+
+#define SYRINGE_CDECL(name, ...) \
+    ((int __cdecl (*)())name.callback)(__VA_ARGS__)
+#define SYRINGE_STDCALL(name, ...) \
+    ((int __stdcall (*)())name.callback)(__VA_ARGS__)
+#define SYRINGE_FASTCALL(name, ...) \
+    ((int __fastcall (*)())name.callback)(__VA_ARGS__)
 
 #define __SYRINGE_H_
 #endif

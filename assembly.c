@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 Toni Spets <toni.spets@iki.fi>
+ * Copyright (c) 2011, 2012 Toni Spets <toni.spets@iki.fi>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -70,7 +70,14 @@ void _asm_reset(_asm_data *d)
 /* very crude way to calculate function alignment for 5 byte JMP */
 int _asm_next(_asm_data *d)
 {
-    unsigned char *cur = d->data + d->pos;
+    unsigned char *cur = (unsigned char *)d->data + d->pos;
+
+    /* PUSH EBX */
+    if (*cur == 0x53)
+    {
+        d->pos++;
+        return 1;
+    }
 
     /* PUSH EBP */
     if (*cur == 0x55)
@@ -79,10 +86,17 @@ int _asm_next(_asm_data *d)
         return 1;
     }
 
+    /* PUSH ESI */
+    if (*cur == 0x56)
+    {
+        d->pos++;
+        return 1;
+    }
+
     /* MOV EBP,ESP */
     if (*cur == 0x89)
     {
-        *cur++;
+        cur++;
         d->pos++;
 
         if (*cur == 0xE5)
@@ -95,7 +109,7 @@ int _asm_next(_asm_data *d)
     /* SUB ESP,<INT8> */
     if (*cur == 0x83)
     {
-        *cur++;
+        cur++;
         d->pos++;
 
         if (*cur == 0xEC)

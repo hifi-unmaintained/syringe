@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 Toni Spets <toni.spets@iki.fi>
+ * Copyright (c) 2011, 2012 Toni Spets <toni.spets@iki.fi>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -79,7 +79,7 @@ static int syringe_main()
 
                     for (int i = 0; i < ret; i ++)
                     {
-                        printf("    hook %s @ 0x%08X -> 0x%08X\n", (hooks[i].name ? hooks[i].name : "<unnamed>"), (intptr_t)hooks[i].func, (intptr_t)hooks[i].addr);
+                        printf("    %s @ 0x%08X -> 0x%08X\n", (hooks[i].name ? hooks[i].name : "<unnamed>"), (intptr_t)hooks[i].func, (intptr_t)hooks[i].addr);
 
                         /* FIXME: stuff everything below to a single memory allocation with correct offsets */
 
@@ -113,21 +113,13 @@ static int syringe_main()
                         WriteProcessMemory(GetCurrentProcess(), cb, mem, sizeof(mem), NULL);
                         _asm_free(a);
 
-                        void *bridge = VirtualAlloc(NULL, 16, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-                        a = _asm_new(16);
-                        _asm(a, 3, 0x36, 0xC7, 0x05);
-                        _asm_dw(a, (DWORD)&syringe_current_cb);
-                        _asm_dw(a, (DWORD)cb);
-                        _asm(a, 1, 0xE9);
-                        _asm_dw(a, syringe_relative((DWORD)bridge + 16, (DWORD)hooks[i].func));
-                        WriteProcessMemory(GetCurrentProcess(), bridge, a->data, a->pos, NULL);
-                        _asm_free(a);
-                        printf("      bridge at %08X\n", (unsigned int)bridge);
+                        /* overwrite magic number with our real function */
+                        hooks[i].callback = (intptr_t)cb;
 
                         /* this is the JMP which is written over the original code */
                         a = _asm_new(5);
                         _asm(a, 1, 0xE9);
-                        _asm_dw(a, syringe_relative(hooks[i].addr + 5, (DWORD)bridge));
+                        _asm_dw(a, syringe_relative(hooks[i].addr + 5, (DWORD)hooks[i].func));
                         WriteProcessMemory(GetCurrentProcess(), (LPVOID)hooks[i].addr, a->data, a->pos, NULL);
                         _asm_free(a);
                     }
