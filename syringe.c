@@ -72,21 +72,21 @@ static int syringe_main()
 
                 if (_syringe_export)
                 {
-                    syringe_hook *hooks = NULL;
+                    syringe_hook **hooks = NULL;
                     int ret = _syringe_export(&hooks, &syringe_current_cb);
 
                     printf("  returned %d hook(s) @ 0x%08X\n", ret, (intptr_t)hooks);
 
                     for (int i = 0; i < ret; i ++)
                     {
-                        printf("    %s @ 0x%08X -> 0x%08X\n", (hooks[i].name ? hooks[i].name : "<unnamed>"), (intptr_t)hooks[i].func, (intptr_t)hooks[i].addr);
+                        printf("    %s @ 0x%08X -> 0x%08X\n", (hooks[i]->name ? hooks[i]->name : "<unnamed>"), (intptr_t)hooks[i]->func, (intptr_t)hooks[i]->addr);
 
                         /* FIXME: stuff everything below to a single memory allocation with correct offsets */
 
                         /* analyze the start of the hook destination to make a necessary size copy with JMP back */
                         char mem[16];
                         int align = 0;
-                        ReadProcessMemory(GetCurrentProcess(), (LPVOID)hooks[i].addr, mem, sizeof(mem), NULL);
+                        ReadProcessMemory(GetCurrentProcess(), (LPVOID)hooks[i]->addr, mem, sizeof(mem), NULL);
                         _asm_data *a = _asm_new(sizeof(mem));
 
                         _asm_buf(a, mem, 16);
@@ -105,7 +105,7 @@ static int syringe_main()
                         void *cb = VirtualAlloc(NULL, sizeof(mem), MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
                         printf("      callback at %08X\n", (unsigned int)cb);
 
-                        DWORD rel_cb = syringe_relative((DWORD)cb + align + 5, (DWORD)hooks[i].addr + align);
+                        DWORD rel_cb = syringe_relative((DWORD)cb + align + 5, (DWORD)hooks[i]->addr + align);
 
                         mem[align] = 0xE9;
                         memcpy(mem + align + 1, &rel_cb, 4);
@@ -114,13 +114,13 @@ static int syringe_main()
                         _asm_free(a);
 
                         /* overwrite magic number with our real function */
-                        hooks[i].callback = (intptr_t)cb;
+                        hooks[i]->callback = (intptr_t)cb;
 
                         /* this is the JMP which is written over the original code */
                         a = _asm_new(5);
                         _asm(a, 1, 0xE9);
-                        _asm_dw(a, syringe_relative(hooks[i].addr + 5, (DWORD)hooks[i].func));
-                        WriteProcessMemory(GetCurrentProcess(), (LPVOID)hooks[i].addr, a->data, a->pos, NULL);
+                        _asm_dw(a, syringe_relative(hooks[i]->addr + 5, (DWORD)hooks[i]->func));
+                        WriteProcessMemory(GetCurrentProcess(), (LPVOID)hooks[i]->addr, a->data, a->pos, NULL);
                         _asm_free(a);
                     }
                 }

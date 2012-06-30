@@ -14,7 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdint.h>
+#if !defined(__i386__) && !defined(_M_IX86)
+#error "Only X86 is supported"
+#endif
+
+#if !defined(_INTPTR_T_DEFINED) && !defined(_intptr_t_defined)
+#include <inttypes.h>
+#endif
 
 #ifndef __SYRINGE_H_
 
@@ -27,12 +33,12 @@ typedef struct
 } syringe_hook;
 
 #define SYRINGE_EXPORT(...) \
-    __declspec(dllexport) int _syringe_export(syringe_hook **_hooks) \
+    __declspec(dllexport) int _syringe_export(syringe_hook ***_hooks) \
     { \
         static syringe_hook *a[] = { \
             __VA_ARGS__ \
         }; \
-        *_hooks = *a; \
+        *_hooks = a; \
         return sizeof a / sizeof (syringe_hook *); \
     }
 
@@ -51,12 +57,16 @@ typedef struct
 #define SYRINGE_CALL(name, ...) \
     name##_func(__VA_ARGS__)
 
+typedef int (__cdecl *SYRINGE_CDECL_TYPE)();
+typedef int (__stdcall *SYRINGE_STDCALL_TYPE)();
+typedef int (__fastcall *SYRINGE_FASTCALL_TYPE)();
+
 #define SYRINGE_CDECL(name, ...) \
-    ((int __cdecl (*)())name.callback)(__VA_ARGS__)
+    ((SYRINGE_CDECL_TYPE)name.callback)(__VA_ARGS__)
 #define SYRINGE_STDCALL(name, ...) \
-    ((int __stdcall (*)())name.callback)(__VA_ARGS__)
+    ((SYRINGE_STDCALL_TYPE)name.callback)(__VA_ARGS__)
 #define SYRINGE_FASTCALL(name, ...) \
-    ((int __fastcall (*)())name.callback)(__VA_ARGS__)
+    ((SYRINGE_FASTCALL_TYPE)name.callback)(__VA_ARGS__)
 
 #define __SYRINGE_H_
 #endif
