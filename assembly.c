@@ -72,6 +72,20 @@ int _asm_next(_asm_data *d)
 {
     unsigned char *cur = (unsigned char *)d->data + d->pos;
 
+    /* PUSH ECX */
+    if (*cur == 0x51)
+    {
+        d->pos++;
+        return 1;
+    }
+
+    /* PUSH EDX */
+    if (*cur == 0x52)
+    {
+        d->pos++;
+        return 1;
+    }
+
     /* PUSH EBX */
     if (*cur == 0x53)
     {
@@ -88,6 +102,13 @@ int _asm_next(_asm_data *d)
 
     /* PUSH ESI */
     if (*cur == 0x56)
+    {
+        d->pos++;
+        return 1;
+    }
+
+    /* PUSH EDI */
+    if (*cur == 0x57)
     {
         d->pos++;
         return 1;
