@@ -140,6 +140,19 @@ int _asm_next(_asm_data *d)
         }
     }
 
+    /* MOV EBP,ESP */
+    if (*cur == 0x8B)
+    {
+        cur++;
+        d->pos++;
+
+        if (*cur == 0xEC)
+        {
+            d->pos++;
+            return 2;
+        }
+    }
+
     printf("_asm_next: Error analyzing opcode %02X\n", *cur);
     return -1;
 }

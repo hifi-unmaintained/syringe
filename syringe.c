@@ -20,34 +20,72 @@
 #include <assembly.h>
 
 static HINSTANCE dlls[256];
-static int syringe_main();
-static void syringe_free();
-int syringe_current_cb = 0;
-
-BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
-{
-    if (fdwReason == DLL_PROCESS_ATTACH)
-    {
-        syringe_main();
-    }
-
-    if (fdwReason == DLL_PROCESS_DETACH)
-    {
-        syringe_free();
-    }
-    
-    return TRUE;
-}
 
 DWORD syringe_relative(DWORD from, DWORD to)
 {
     return from <= to ? to - from : ~(from - to) + 1;
 }
 
+__declspec(dllexport) int __stdcall syringe_attach(void **func, void *repl)
+{
+    printf("    0x%08X -> 0x%08X\n", (unsigned int)*func, (unsigned int)repl);
+
+    /* FIXME: stuff everything below to a single memory allocation with correct offsets */
+
+    /* analyze the start of the hook destination to make a necessary size copy with JMP back */
+    char mem[16];
+    int align = 0;
+    ReadProcessMemory(GetCurrentProcess(), *func, mem, sizeof(mem), NULL);
+    _asm_data *a = _asm_new(sizeof(mem));
+
+    _asm_buf(a, mem, 16);
+    _asm_reset(a);
+
+    while (align < 5)
+    {
+        int cur = _asm_next(a);
+
+        if (cur < 0)
+        {
+            printf("      failed to calculate function alignment\n");
+            return SYRINGE_ERROR;
+        }
+
+        align += cur;
+    }
+
+    printf("      function alignment is %d bytes\n", align);
+
+    void *cb = VirtualAlloc(NULL, sizeof(mem), MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    printf("      bridge at %08X\n", (unsigned int)cb);
+
+    DWORD rel_cb = syringe_relative((DWORD)cb + align + 5, (DWORD)*func + align);
+
+    mem[align] = 0xE9;
+    memcpy(mem + align + 1, &rel_cb, 4);
+
+    WriteProcessMemory(GetCurrentProcess(), cb, mem, sizeof(mem), NULL);
+    _asm_free(a);
+
+    /* this is the JMP which is written over the original code */
+    a = _asm_new(5);
+    _asm(a, 1, 0xE9);
+    _asm_dw(a, syringe_relative((unsigned int)*func + 5, (unsigned int)repl));
+    WriteProcessMemory(GetCurrentProcess(), *func, a->data, a->pos, NULL);
+    _asm_free(a);
+
+    /* overwrite old function pointer with bridge */
+    *func = cb;
+
+    return SYRINGE_SUCCESS;
+}
+
 static int syringe_main()
 {
     HANDLE fh;
     WIN32_FIND_DATA fd;
+
+    syringe_exports export_table = { syringe_attach };
 
     memset(dlls, 0, sizeof(dlls));
 
@@ -65,67 +103,18 @@ static int syringe_main()
             dlls[idx] = LoadLibrary(fd.cFileName);
             if (dlls[idx])
             {
-                FARPROC _syringe_export = GetProcAddress(dlls[idx], "_syringe_export");
+                FARPROC syringe_init = GetProcAddress(dlls[idx], "syringe_init");
 
-                printf("  loaded at 0x%08X\n", (intptr_t)dlls[idx]);
-                printf("  _syringe_export @ 0x%08X\n", (intptr_t)_syringe_export);
+                printf("  loaded at 0x%08X\n", (unsigned int)dlls[idx]);
+                printf("  syringe_init @ 0x%08X\n", (unsigned int)syringe_init);
 
-                if (_syringe_export)
+                if (syringe_init)
                 {
-                    syringe_hook **hooks = NULL;
-                    int ret = _syringe_export(&hooks, &syringe_current_cb);
-
-                    printf("  returned %d hook(s) @ 0x%08X\n", ret, (intptr_t)hooks);
-
-                    for (int i = 0; i < ret; i ++)
-                    {
-                        printf("    %s @ 0x%08X -> 0x%08X\n", (hooks[i]->name ? hooks[i]->name : "<unnamed>"), (intptr_t)hooks[i]->func, (intptr_t)hooks[i]->addr);
-
-                        /* FIXME: stuff everything below to a single memory allocation with correct offsets */
-
-                        /* analyze the start of the hook destination to make a necessary size copy with JMP back */
-                        char mem[16];
-                        int align = 0;
-                        ReadProcessMemory(GetCurrentProcess(), (LPVOID)hooks[i]->addr, mem, sizeof(mem), NULL);
-                        _asm_data *a = _asm_new(sizeof(mem));
-
-                        _asm_buf(a, mem, 16);
-                        _asm_reset(a);
-
-                        while (align < 5)
-                        {
-                            int cur = _asm_next(a);
-                            if (cur < 0)
-                                exit(1);
-                            align += cur;
-                        }
-
-                        printf("      function alignment is %d bytes\n", align);
-
-                        void *cb = VirtualAlloc(NULL, sizeof(mem), MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-                        printf("      callback at %08X\n", (unsigned int)cb);
-
-                        DWORD rel_cb = syringe_relative((DWORD)cb + align + 5, (DWORD)hooks[i]->addr + align);
-
-                        mem[align] = 0xE9;
-                        memcpy(mem + align + 1, &rel_cb, 4);
-
-                        WriteProcessMemory(GetCurrentProcess(), cb, mem, sizeof(mem), NULL);
-                        _asm_free(a);
-
-                        /* overwrite magic number with our real function */
-                        hooks[i]->callback = (intptr_t)cb;
-
-                        /* this is the JMP which is written over the original code */
-                        a = _asm_new(5);
-                        _asm(a, 1, 0xE9);
-                        _asm_dw(a, syringe_relative(hooks[i]->addr + 5, (DWORD)hooks[i]->func));
-                        WriteProcessMemory(GetCurrentProcess(), (LPVOID)hooks[i]->addr, a->data, a->pos, NULL);
-                        _asm_free(a);
-                    }
+                    syringe_init(&export_table);
                 }
                 else
                 {
+                    printf("  no entrypoint found, ignoring this dll\n");
                     FreeLibrary(dlls[idx]);
                     dlls[idx] = NULL;
                 }
@@ -155,7 +144,22 @@ static void syringe_free()
             break;
         }
 
-        printf("Unloading module 0x%08X\n", (intptr_t)dlls[i]);
+        printf("Unloading module 0x%08X\n", (unsigned int)dlls[i]);
         FreeLibrary(dlls[i]);
     }
+}
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
+{
+    if (fdwReason == DLL_PROCESS_ATTACH)
+    {
+        syringe_main();
+    }
+
+    if (fdwReason == DLL_PROCESS_DETACH)
+    {
+        syringe_free();
+    }
+    
+    return TRUE;
 }
