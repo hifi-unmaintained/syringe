@@ -19,14 +19,14 @@ typedef struct
     char *data;
     int size;
     int pos;
-} _asm_data;
+} assembly_data;
 
-_asm_data *_asm_new(int);
-void _asm_free(_asm_data *);
+assembly_data *assembly_new(int);
+void assembly_free(assembly_data *);
 
-void _asm(_asm_data *, int cnt, ...);
-void _asm_dw(_asm_data *, unsigned int);
-void _asm_buf(_asm_data *d, char *buf, int len);
-void _asm_reset(_asm_data *d);
-int _asm_next(_asm_data *d);
-void _asm_dump(_asm_data *);
+void assembly_put(assembly_data *, int cnt, ...);
+void assembly_dw(assembly_data *, unsigned int);
+void assembly_buf(assembly_data *d, char *buf, int len);
+void assembly_reset(assembly_data *d);
+int assembly_next(assembly_data *d);
+void assembly_dump(assembly_data *);

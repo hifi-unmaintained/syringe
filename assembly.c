@@ -20,9 +20,9 @@
 #include <stdarg.h>
 #include <assembly.h>
 
-_asm_data *_asm_new(int size)
+assembly_data *assembly_new(int size)
 {
-    _asm_data *d = malloc(sizeof(_asm_data));
+    assembly_data *d = malloc(sizeof(assembly_data));
     d->data = malloc(size);
     memset(d->data, 0, size);
     d->size = size;
@@ -30,13 +30,13 @@ _asm_data *_asm_new(int size)
     return d;
 }
 
-void _asm_free(_asm_data *d)
+void assembly_free(assembly_data *d)
 {
     free(d->data);
     free(d);
 }
 
-void _asm(_asm_data *d, int cnt, ...)
+void assembly_put(assembly_data *d, int cnt, ...)
 {
     va_list ap;
 
@@ -51,24 +51,24 @@ void _asm(_asm_data *d, int cnt, ...)
     va_end(ap);
 }
 
-void _asm_dw(_asm_data *d, unsigned int dw)
+void assembly_dw(assembly_data *d, unsigned int dw)
 {
-    _asm(d, 4, dw, dw >> 8, dw >> 16, dw >> 24);
+    assembly_put(d, 4, dw, dw >> 8, dw >> 16, dw >> 24);
 }
 
-void _asm_buf(_asm_data *d, char *buf, int len)
+void assembly_buf(assembly_data *d, char *buf, int len)
 {
     memcpy(d->data+d->pos, buf, len);
     d->pos += len;
 }
 
-void _asm_reset(_asm_data *d)
+void assembly_reset(assembly_data *d)
 {
     d->pos = 0;
 }
 
 /* very crude way to calculate function alignment for 5 byte JMP */
-int _asm_next(_asm_data *d)
+int assembly_next(assembly_data *d)
 {
     unsigned char *cur = (unsigned char *)d->data + d->pos;
 
@@ -153,11 +153,11 @@ int _asm_next(_asm_data *d)
         }
     }
 
-    printf("_asm_next: Error analyzing opcode %02X\n", *cur);
+    printf("assembly_next: Error analyzing opcode %02X\n", *cur);
     return -1;
 }
 
-void _asm_dump(_asm_data *d)
+void assembly_dump(assembly_data *d)
 {
     printf("Dumping %d bytes of compiled code from %p in hex:\n", d->pos, d);
     for (int i = 0; i < d->pos; i++)

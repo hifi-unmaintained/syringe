@@ -45,7 +45,7 @@ int main(int argc, char **argv)
         LPVOID ptr_syringe_dll = VirtualAllocEx(hProcess, NULL, strlen(str_syringe_dll)+1, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
         WriteProcessMemory(hProcess, ptr_syringe_dll, str_syringe_dll, strlen(str_syringe_dll)+1, NULL);
 
-        DWORD ptr_LoadLibraryA = (DWORD)GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA");
+        DWORD ptr_LoadLibraryA = (DWORD)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
 
         CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)ptr_LoadLibraryA, ptr_syringe_dll, 0, &dwThread);
 

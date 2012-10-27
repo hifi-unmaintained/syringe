@@ -36,14 +36,14 @@ __declspec(dllexport) int __stdcall syringe_attach(void **func, void *repl)
     char mem[16];
     int align = 0;
     ReadProcessMemory(GetCurrentProcess(), *func, mem, sizeof(mem), NULL);
-    _asm_data *a = _asm_new(sizeof(mem));
+    assembly_data *a = assembly_new(sizeof(mem));
 
-    _asm_buf(a, mem, 16);
-    _asm_reset(a);
+    assembly_buf(a, mem, 16);
+    assembly_reset(a);
 
     while (align < 5)
     {
-        int cur = _asm_next(a);
+        int cur = assembly_next(a);
 
         if (cur < 0)
         {
@@ -65,14 +65,14 @@ __declspec(dllexport) int __stdcall syringe_attach(void **func, void *repl)
     memcpy(mem + align + 1, &rel_cb, 4);
 
     WriteProcessMemory(GetCurrentProcess(), cb, mem, sizeof(mem), NULL);
-    _asm_free(a);
+    assembly_free(a);
 
     /* this is the JMP which is written over the original code */
-    a = _asm_new(5);
-    _asm(a, 1, 0xE9);
-    _asm_dw(a, syringe_relative((unsigned int)*func + 5, (unsigned int)repl));
+    a = assembly_new(5);
+    assembly_put(a, 1, 0xE9);
+    assembly_dw(a, syringe_relative((unsigned int)*func + 5, (unsigned int)repl));
     WriteProcessMemory(GetCurrentProcess(), *func, a->data, a->pos, NULL);
-    _asm_free(a);
+    assembly_free(a);
 
     /* overwrite old function pointer with bridge */
     *func = cb;
