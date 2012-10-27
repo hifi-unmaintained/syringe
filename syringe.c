@@ -103,7 +103,7 @@ static int syringe_main()
             dlls[idx] = LoadLibrary(fd.cFileName);
             if (dlls[idx])
             {
-                FARPROC syringe_init = GetProcAddress(dlls[idx], "syringe_init");
+                SYRINGE_INIT syringe_init = (SYRINGE_INIT)GetProcAddress(dlls[idx], "syringe_init");
 
                 printf("  loaded at 0x%08X\n", (unsigned int)dlls[idx]);
                 printf("  syringe_init @ 0x%08X\n", (unsigned int)syringe_init);

@@ -33,8 +33,10 @@ enum {
 };
 
 typedef struct {
-    int __stdcall (*attach)(void **func, void *repl);
+    int (__stdcall *attach)(void **func, void *repl);
 } syringe_exports;
+
+typedef void (__stdcall *SYRINGE_INIT)(syringe_exports *);
 
 #define __SYRINGE_H_
 #endif
