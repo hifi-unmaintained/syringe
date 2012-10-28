@@ -16,8 +16,8 @@
 
 #include <windows.h>
 #include <stdio.h>
-#include <syringe.h>
-#include <assembly.h>
+#include "syringe.h"
+#include "assembly.h"
 
 static HINSTANCE dlls[256];
 
@@ -83,7 +83,7 @@ __declspec(dllexport) int __stdcall syringe_attach(void **func, void *repl)
 static int syringe_main()
 {
     HANDLE fh;
-    WIN32_FIND_DATA fd;
+    WIN32_FIND_DATAA fd;
 
     syringe_exports export_table = { syringe_attach };
 
@@ -91,7 +91,7 @@ static int syringe_main()
 
     printf("Searching for modules...\n");
 
-    fh = FindFirstFile("syringe-*.dll", &fd);
+    fh = FindFirstFileA("syringe-*.dll", &fd);
 
     if (fh)
     {
@@ -100,7 +100,7 @@ static int syringe_main()
         do
         {
             printf("Loading module %s\n", fd.cFileName);
-            dlls[idx] = LoadLibrary(fd.cFileName);
+            dlls[idx] = LoadLibraryA(fd.cFileName);
             if (dlls[idx])
             {
                 SYRINGE_INIT syringe_init = (SYRINGE_INIT)GetProcAddress(dlls[idx], "syringe_init");
@@ -114,7 +114,7 @@ static int syringe_main()
                 }
                 else
                 {
-                    printf("  no entrypoint found, ignoring this dll\n");
+                    printf("no entrypoint found, ignoring this dll, last error: %d\n", GetLastError());
                     FreeLibrary(dlls[idx]);
                     dlls[idx] = NULL;
                 }
@@ -125,7 +125,7 @@ static int syringe_main()
             {
                 printf("Error loading module!\n");
             }
-        } while(FindNextFile(fh, &fd));
+        } while(FindNextFileA(fh, &fd));
 
         FindClose(fh);
     }
