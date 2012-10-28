@@ -20,11 +20,16 @@
 
 #ifndef __SYRINGE_H_
 
+#include <Windows.h>
+
 #ifdef __GNUC__
-    #define GET_THIS(this) __asm__ __volatile__ ("movl %%ecx, %0" : "=m" (this))
+   #define GET_THIS(this) __asm__ __volatile__ ("movl %%ecx, %0" : "=m" (this))
     #define SET_THIS(this) __asm__ __volatile__ ("movl %0, %%ecx" : "=m" (this))
+#elif defined _MSC_VER
+    #define GET_THIS(this) _asm(mov this, ecx)
+	#define SET_THIS(this) _asm(mov ecx, this)
 #else
-    #error "Need explicit compiler support for thiscall"
+   #error "Need explicit compiler support for thiscall"
 #endif
 
 enum {
@@ -33,7 +38,7 @@ enum {
 };
 
 typedef struct {
-    int (__stdcall *attach)(void **func, void *repl);
+   int (__stdcall *attach)(void **func, void *repl);
 } syringe_exports;
 
 typedef void (__stdcall *SYRINGE_INIT)(syringe_exports *);
