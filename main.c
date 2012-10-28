@@ -40,12 +40,16 @@ int main(int argc, char **argv)
 
         printf("syringe: Host program loaded, injecting %s\n", str_syringe_dll);
 
-        HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD|PROCESS_VM_OPERATION|PROCESS_VM_WRITE, TRUE, pInfo.dwProcessId);
+        HANDLE hProcess = OpenProcess(PROCESS_CREATE_THREAD|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|PROCESS_VM_WRITE|PROCESS_VM_OPERATION, FALSE, pInfo.dwProcessId); 
+
+    	printf("hProcess = %p\n", hProcess);
 
         LPVOID ptr_syringe_dll = VirtualAllocEx(hProcess, NULL, strlen(str_syringe_dll)+1, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
         WriteProcessMemory(hProcess, ptr_syringe_dll, str_syringe_dll, strlen(str_syringe_dll)+1, NULL);
 
         DWORD ptr_LoadLibraryA = (DWORD)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
+		
+		printf("LoadLibraryA = %p\n", ptr_LoadLibraryA);
 
         CreateRemoteThread(hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)ptr_LoadLibraryA, ptr_syringe_dll, 0, &dwThread);
 
