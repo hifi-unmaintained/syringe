@@ -18,12 +18,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <assembly.h>
+#include "assembly.h"
 
 assembly_data *assembly_new(int size)
 {
-    assembly_data *d = malloc(sizeof(assembly_data));
-    d->data = malloc(size);
+    assembly_data *d = (assembly_data*)malloc(sizeof(assembly_data));
+    d->data = (char*)malloc(size);
     memset(d->data, 0, size);
     d->size = size;
     d->pos = 0;
@@ -127,6 +127,15 @@ int assembly_next(assembly_data *d)
         }
     }
 
+
+    /* PUSH <INT8> */
+	if (*cur == 0x6A)
+	{
+		d->pos+= 2;
+
+		return 2;
+	}
+
     /* SUB ESP,<INT8> */
     if (*cur == 0x83)
     {
@@ -151,7 +160,59 @@ int assembly_next(assembly_data *d)
             d->pos++;
             return 2;
         }
+		/* MOV EDI, EDI */
+		else if (*cur == 0xFF)
+		{
+			d->pos++;
+			return 2;
+		}
+		/* MOV EBP, ECX */
+		else if (*cur == 0xE9)
+		{
+			d->pos++;
+			return 2;
+		}
     }
+
+	/* Not sure if this is the right description */
+	/* SUB ESP, <INT32> */
+	if (*cur == 0x81)
+
+		cur++;
+		d->pos++;
+
+		if (*cur == 0xEC)
+		{
+			d->pos+= 5;
+			return 6;
+		}
+//	0043B8C0                 mov     al, byte_81C644
+//	A0 44 C6 81 00
+	/* MOV AL, <32 BIT ADDRESS> */
+	if (*cur == 0xa0)
+	{
+		cur++;
+		d->pos+= 5;
+		return 5;
+	}
+
+	/* SUB ESP, <INT8> */
+	if (*cur == 0x83)
+	{
+		cur++;
+		
+		if (*cur == 0xEC)
+		{
+			d->pos+= 3;
+			return 3;
+		}
+	}
+	/* MOV EAX, <32 BIT ADDRESS> */
+	if (*cur == 0xA1)
+	{
+		d->pos += 5;
+		return 5;
+	}
 
     printf("assembly_next: Error analyzing opcode %02X\n", *cur);
     return -1;
